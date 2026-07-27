@@ -79,7 +79,7 @@ MOBILE_HTML = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LumaLink 移动端拍摄</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: "MiSans", "Microsoft YaHei", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
         body { background: #f3f4f6; color: #1f2937; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
         @media (prefers-color-scheme: dark) {
             body { background: #202020; color: #ffffff; }

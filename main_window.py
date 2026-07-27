@@ -10,8 +10,9 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QSize, Qt, QUrl, Slot
-from PySide6.QtGui import QDesktopServices, QImage, QPixmap
+from PySide6.QtCore import QSize, Qt, QTimer, QUrl, Slot
+from PySide6.QtGui import QDesktopServices, QIcon, QImage, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -21,6 +22,28 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+def load_svg_pixmap(svg_path: Path, target_width: int) -> QPixmap:
+    """高清渲染 SVG 矢量资源为指定精度的 QPixmap 画面。"""
+    if not svg_path.exists():
+        return QPixmap()
+    try:
+        renderer = QSvgRenderer(str(svg_path))
+        if not renderer.isValid():
+            return QPixmap(str(svg_path))
+        size = renderer.defaultSize()
+        if size.width() <= 0 or size.height() <= 0:
+            return QPixmap(str(svg_path))
+        target_height = int(size.height() * (target_width / size.width()))
+        img = QImage(target_width, target_height, QImage.Format.Format_ARGB32_Premultiplied)
+        img.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(img)
+        renderer.render(painter)
+        painter.end()
+        return QPixmap.fromImage(img)
+    except Exception:
+        return QPixmap(str(svg_path))
 from qfluentwidgets import (
     CaptionLabel,
     CardWidget,
@@ -174,6 +197,20 @@ class MainWindow(FluentWindow):
         self.setWindowTitle("LumaLink")
         self.resize(1180, 760)
         self.setMinimumSize(850, 580)
+
+        # 设置系统窗口级图标 (优先构造 QPixmap 加载确保 Windows 任务栏正常渲染图标)
+        icon_path = Path(__file__).resolve().parent / "assets" / "lumalink_icon_mark.png"
+        if icon_path.exists():
+            icon_pixmap = QPixmap(str(icon_path))
+            if not icon_pixmap.isNull():
+                self.setWindowIcon(QIcon(icon_pixmap))
+
+        # 仅隐藏顶部标题栏图标控件（避免在应用顶部显示），不影响 Windows 系统任务栏图标
+        try:
+            if hasattr(self, "titleBar") and hasattr(self.titleBar, "iconWidget"):
+                self.titleBar.iconWidget.hide()
+        except Exception:
+            pass
 
         # 开启 Windows 11 Mica 云母材质
         try:
@@ -523,15 +560,13 @@ class MainWindow(FluentWindow):
         about_layout.setSpacing(10)
 
         about_layout.addWidget(SubtitleLabel("关于与开发者"))
-        about_layout.addWidget(CaptionLabel("LumaLink（中文名：拾光）— 极简局域网无线拍照助手"))
 
         about_row = QHBoxLayout()
         about_row.setSpacing(16)
 
         about_info = QVBoxLayout()
         about_info.setSpacing(4)
-        about_info.addWidget(StrongBodyLabel("项目名称: LumaLink (中文名: 拾光)", self.settings_container))
-        about_info.addWidget(CaptionLabel("软件版本: v1.2  |  GitHub 开发者: Kipfel-Log", self.settings_container))
+        about_info.addWidget(StrongBodyLabel("GitHub 开发者: Kipfel-Log", self.settings_container))
         about_row.addLayout(about_info, 1)
 
         # GitHub 开发者主页链接按钮 (HyperlinkButton 内置自动打开 URL，无需重复 connect)
@@ -555,6 +590,33 @@ class MainWindow(FluentWindow):
         about_layout.addLayout(about_row)
         settings_vbox.addWidget(about_card)
 
+        # 底部居中展示大 Logo、产品描述与版本号
+        footer_vbox = QVBoxLayout()
+        footer_vbox.setContentsMargins(0, 24, 0, 16)
+        footer_vbox.setSpacing(6)
+        footer_vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        full_logo_path = Path(__file__).resolve().parent / "assets" / "lumalink_full_lockup.png"
+        if full_logo_path.exists():
+            logo_label = QLabel(self.settings_container)
+            logo_pix = QPixmap(str(full_logo_path))
+            if not logo_pix.isNull():
+                logo_pix = logo_pix.scaledToWidth(140, Qt.TransformationMode.SmoothTransformation)
+                logo_label.setPixmap(logo_pix)
+            logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            footer_vbox.addWidget(logo_label, 0, Qt.AlignmentFlag.AlignCenter)
+
+        desc_lbl = CaptionLabel("极简局域网无线拍照助手", self.settings_container)
+        desc_lbl.setStyleSheet("color: #888888; font-size: 12px;")
+        desc_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        footer_vbox.addWidget(desc_lbl, 0, Qt.AlignmentFlag.AlignCenter)
+
+        ver_lbl = CaptionLabel("v1.2", self.settings_container)
+        ver_lbl.setStyleSheet("color: #aaaaaa; font-size: 11px;")
+        ver_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        footer_vbox.addWidget(ver_lbl, 0, Qt.AlignmentFlag.AlignCenter)
+
+        settings_vbox.addLayout(footer_vbox)
         settings_vbox.addStretch(1)
 
         # 根据当前配置同步组件禁用状态
@@ -585,13 +647,21 @@ class MainWindow(FluentWindow):
         self._populate_network_cards()
 
         if ok:
-            current_ip = self.server_mgr.current_ip
+            # 优先使用保存的偏好网卡 IP，若不存在或无效则使用服务器自动选择的默认 IP
+            target_ip = self.config_mgr.preferred_ip or self.server_mgr.current_ip
+            selected_idx = 0
             for idx in range(self.net_combo.count()):
-                if self.net_combo.itemData(idx) == current_ip:
-                    self.net_combo.setCurrentIndex(idx)
+                if self.net_combo.itemData(idx) == target_ip:
+                    selected_idx = idx
                     break
 
-            self._update_qr_and_url(current_ip)
+            self.net_combo.blockSignals(True)
+            self.net_combo.setCurrentIndex(selected_idx)
+            self.net_combo.blockSignals(False)
+
+            active_ip = self.net_combo.itemData(selected_idx) or target_ip
+            self.server_mgr.current_ip = active_ip
+            self._update_qr_and_url(active_ip)
             self.pin_val_label.setText(self.server_mgr.pin_code)
         else:
             self.status_label.setText("服务器启动失败")
@@ -713,11 +783,15 @@ class MainWindow(FluentWindow):
         if not chosen_ip:
             return
 
+        # 持久化保存用户偏好的网卡 IP
+        self.config_mgr.preferred_ip = chosen_ip
+        self.config_mgr.save()
+
         self.server_mgr.current_ip = chosen_ip
         self._update_qr_and_url(chosen_ip)
 
         InfoBar.info(
-            title="通信网卡/IP 已切换",
+            title="通信网卡/IP 已切换并保存",
             content=f"手机访问 IP 已切换为: {chosen_ip}",
             parent=self,
             position=InfoBarPosition.TOP,
@@ -847,5 +921,6 @@ class MainWindow(FluentWindow):
         self.clear_btn.setEnabled(count > 0)
 
     def closeEvent(self, event) -> None:
+        self.config_mgr.save()
         self.server_mgr.stop_server()
         super().closeEvent(event)

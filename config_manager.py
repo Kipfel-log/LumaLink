@@ -14,7 +14,14 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
+import sys
+
+if getattr(sys, "frozen", False):
+    # 打包为 EXE 运行：配置文件存放在 EXE 程序所在同级目录下
+    DEFAULT_CONFIG_PATH = Path(sys.executable).parent / "config.json"
+else:
+    # 源码模式运行：配置文件存放在源码同级目录下
+    DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 
 
 class AppConfig:
@@ -28,6 +35,7 @@ class AppConfig:
         default_dir = Path.home() / "Pictures" / "MobilePhotos"
         self.save_dir: str = str(default_dir)
         self.server_port: int = 8989
+        self.preferred_ip: str = ""
         self.theme: str = "Auto"
 
         # 自动重命名设置
@@ -52,6 +60,7 @@ class AppConfig:
 
                 self.save_dir = str(data.get("save_dir", self.save_dir))
                 self.server_port = int(data.get("server_port", self.server_port))
+                self.preferred_ip = str(data.get("preferred_ip", self.preferred_ip))
                 self.theme = str(data.get("theme", self.theme))
 
                 self.auto_rename_enabled = bool(data.get("auto_rename_enabled", self.auto_rename_enabled))
@@ -68,6 +77,7 @@ class AppConfig:
         data = {
             "save_dir": self.save_dir,
             "server_port": self.server_port,
+            "preferred_ip": self.preferred_ip,
             "theme": self.theme,
             "auto_rename_enabled": self.auto_rename_enabled,
             "name_prefix": self.name_prefix,

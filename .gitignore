@@ -75,3 +75,7 @@ venv.bak/
 *~
 .DS_Store
 Thumbs.db
+
+build_exe.py
+build
+dist

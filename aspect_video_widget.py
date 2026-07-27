@@ -54,6 +54,8 @@ class AspectVideoWidget(QWidget):
             painter.drawPixmap(dest, self._pixmap, QRectF(self._pixmap.rect()))
         elif self._text:
             painter.setPen(QColor("#888888"))
-            font = QFont("Segoe UI", 11)
+            font = QFont()
+            font.setFamilies(["MiSans", "Microsoft YaHei", "Segoe UI", "sans-serif"])
+            font.setPointSize(11)
             painter.setFont(font)
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._text)

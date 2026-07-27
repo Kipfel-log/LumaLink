@@ -1,14 +1,35 @@
-"""main.py — 手机扫码拍照助手程序入口。"""
-from __future__ import annotations
-
+import ctypes
+import os
 import sys
 from pathlib import Path
+
+# 注册 Windows 显式 AppUserModelID，确保 Windows 任务栏正常显示自定义应用图标
+try:
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("KipfelLog.LumaLink.v1.2")
+except Exception:
+    pass
+
+# 修复 Windows PyInstaller 环境下 PySide6 C++ DLL 加载路径问题
+if getattr(sys, "frozen", False):
+    base_dir = Path(sys.executable).parent
+    internal_dir = base_dir / "_internal"
+    pyside_dir = internal_dir / "PySide6"
+    for d in [pyside_dir, internal_dir, pyside_dir / "Qt" / "bin"]:
+        if d.exists():
+            try:
+                os.add_dll_directory(str(d))
+            except Exception:
+                pass
+
+# 显式首先导入 PySide6 触发 C++ 动态库初始化
+import PySide6
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import QApplication
 from qfluentwidgets import setTheme, Theme
 
 from config_manager import AppConfig
-from main_window import MainWindow
+from main_window import MainWindow, load_svg_pixmap
 
 
 def main() -> None:
@@ -18,6 +39,19 @@ def main() -> None:
     )
 
     app = QApplication(sys.argv)
+
+    # 设置任务栏全局图标 (assets/lumalink_icon_mark.png)
+    icon_path = Path(__file__).resolve().parent / "assets" / "lumalink_icon_mark.png"
+    if icon_path.exists():
+        from PySide6.QtGui import QPixmap
+        pix = QPixmap(str(icon_path))
+        if not pix.isNull():
+            app.setWindowIcon(QIcon(pix))
+
+    # 全局设置应用默认字体为 MiSans (含备用字体 fallback)
+    app_font = QFont()
+    app_font.setFamilies(["MiSans", "Microsoft YaHei", "Segoe UI", "sans-serif"])
+    app.setFont(app_font)
 
     # 读取持久化配置
     config_mgr = AppConfig()
