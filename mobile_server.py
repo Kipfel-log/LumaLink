@@ -10,9 +10,11 @@ import io
 import json
 import random
 import socket
+import socketserver
+import sys
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Optional
 
@@ -407,10 +409,24 @@ class MobileHTTPHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(obj).encode("utf-8"))
 
 
-class ThreadedMobileHTTPServer(HTTPServer):
+class ThreadedMobileHTTPServer(ThreadingHTTPServer):
     def __init__(self, server_address, RequestHandlerClass, manager: MobileServerManager):
         super().__init__(server_address, RequestHandlerClass)
         self.manager = manager
+
+    def server_bind(self):
+        # 覆盖 server_bind 规避 socket.getfqdn("0.0.0.0") 在 Windows 局域网下触发的反向 DNS 查询卡顿/超时
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = host
+        self.server_port = port
+
+    def handle_error(self, request, client_address):
+        # 优雅捕获客户端强制断开/取消连接抛出的 ConnectionResetError，避免在控制台刷报错日志
+        exctype, _, _ = sys.exc_info()
+        if exctype in (ConnectionResetError, BrokenPipeError):
+            return
+        super().handle_error(request, client_address)
 
 
 class MobileServerManager(QObject):
@@ -514,7 +530,8 @@ class MobileServerManager(QObject):
             self.port = target_port
 
         lan_ips = get_all_lan_ips()
-        self.current_ip = lan_ips[0]
+        if not self.current_ip or self.current_ip not in lan_ips:
+            self.current_ip = lan_ips[0]
 
         if self.is_running:
             return True, f"http://{self.current_ip}:{self.port}"

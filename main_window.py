@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -164,7 +165,10 @@ class PhotoItemWidget(QWidget):
 
     def _locate_file(self) -> None:
         if self.path_obj.exists():
-            os.system(f'explorer /select,"{str(self.path_obj.resolve())}"')
+            subprocess.Popen(
+                ["explorer", "/select,", str(self.path_obj.resolve())],
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
 
     def _open_file(self) -> None:
         if self.path_obj.exists():
@@ -683,9 +687,14 @@ class MainWindow(FluentWindow):
         self.qr_label.setPixmap(pm)
 
     def _on_apply_port(self) -> None:
-        """用户提交修改服务端口。"""
+        """用户提交修改服务端口与通信网卡。"""
         new_port = self.port_spin.value()
+        chosen_ip = self.net_combo.itemData(self.net_combo.currentIndex())
+
         self.config_mgr.server_port = new_port
+        if chosen_ip:
+            self.config_mgr.preferred_ip = chosen_ip
+            self.server_mgr.current_ip = chosen_ip
         self.config_mgr.save()
 
         ok, default_url = self.server_mgr.restart_server(new_port)
@@ -693,8 +702,8 @@ class MainWindow(FluentWindow):
             current_ip = self.server_mgr.current_ip
             self._update_qr_and_url(current_ip)
             InfoBar.success(
-                title="通信端口已更新",
-                content=f"已成功绑定端口 {new_port}，访问地址: {default_url}",
+                title="网络通信设置已更新",
+                content=f"已成功绑定端口 {new_port}，访问地址: http://{current_ip}:{new_port}",
                 parent=self,
                 position=InfoBarPosition.TOP,
                 duration=3500,
