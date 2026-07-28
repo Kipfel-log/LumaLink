@@ -7,12 +7,13 @@
 from __future__ import annotations
 
 import os
+import sys
 import subprocess
 from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl, Slot
-from PySide6.QtGui import QDesktopServices, QIcon, QImage, QPainter, QPixmap
+from PySide6.QtGui import QBrush, QColor, QDesktopServices, QIcon, QImage, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -23,6 +24,17 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+def get_background_dir() -> Path:
+    """获取背景图片资源存放目录 Path。"""
+    if getattr(sys, "frozen", False):
+        base_dir = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    else:
+        base_dir = Path(__file__).resolve().parent
+    bg_dir = base_dir / "assets" / "background"
+    bg_dir.mkdir(parents=True, exist_ok=True)
+    return bg_dir
 
 
 def load_svg_pixmap(svg_path: Path, target_width: int) -> QPixmap:
@@ -60,6 +72,7 @@ from qfluentwidgets import (
     PrimaryPushButton,
     PushButton,
     ScrollArea,
+    Slider,
     SpinBox,
     StrongBodyLabel,
     SubtitleLabel,
@@ -225,6 +238,7 @@ class MainWindow(FluentWindow):
         # 1. 独立设置页与主功能页 Widget
         self.home_interface = QWidget(self)
         self.home_interface.setObjectName("homeInterface")
+        self.home_interface.setStyleSheet("background: transparent;")
 
         # 使用 QFluentWidgets 的 ScrollArea 作为设置页滚动区域，防止界面卡片重叠
         self.settings_interface = ScrollArea(self)
@@ -237,9 +251,13 @@ class MainWindow(FluentWindow):
         self.settings_container.setStyleSheet("background-color: transparent;")
         self.settings_interface.setWidget(self.settings_container)
 
+        self._bg_pixmap: QPixmap | None = None
+        self._update_background_pixmap()
+
         # 先初始化设置界面与主界面控件
         self._init_settings_interface()
         self._init_home_interface()
+        self._update_card_styles()
 
         # 3. 注册添加到侧边栏导航
         self.addSubInterface(
@@ -269,9 +287,10 @@ class MainWindow(FluentWindow):
         main_vbox.addWidget(self.splitter, 1)
 
         # (A) 左侧扫码与配对面板
-        left_card = CardWidget(self.home_interface)
-        left_card.setMinimumWidth(360)
-        left_layout = QVBoxLayout(left_card)
+        self.left_card = CardWidget(self.home_interface)
+        self.left_card.setObjectName("leftCard")
+        self.left_card.setMinimumWidth(360)
+        left_layout = QVBoxLayout(self.left_card)
         left_layout.setContentsMargins(18, 16, 18, 16)
         left_layout.setSpacing(12)
 
@@ -306,9 +325,9 @@ class MainWindow(FluentWindow):
         left_layout.addLayout(qr_box)
 
         # 6 位 PIN 码配对卡片
-        pin_card = CardWidget(self.home_interface)
-        pin_card.setStyleSheet("background-color: rgba(0, 95, 184, 0.05); border: 1px dashed #005fb8; border-radius: 8px;")
-        pin_layout = QHBoxLayout(pin_card)
+        self.pin_card = CardWidget(self.home_interface)
+        self.pin_card.setObjectName("pinCard")
+        pin_layout = QHBoxLayout(self.pin_card)
         pin_layout.setContentsMargins(14, 8, 14, 8)
 
         pin_info_vbox = QVBoxLayout()
@@ -324,7 +343,7 @@ class MainWindow(FluentWindow):
         self.refresh_pin_btn.clicked.connect(self._on_refresh_pin)
         pin_layout.addWidget(self.refresh_pin_btn)
 
-        left_layout.addWidget(pin_card)
+        left_layout.addWidget(self.pin_card)
 
         # 已连接设备指示
         self.client_label = CaptionLabel("已连接设备: 0 台手机", self.home_interface)
@@ -332,18 +351,19 @@ class MainWindow(FluentWindow):
         left_layout.addWidget(self.client_label)
 
         # 使用指南
-        guide_card = CardWidget(self.home_interface)
-        guide_vbox = QVBoxLayout(guide_card)
+        self.guide_card = CardWidget(self.home_interface)
+        self.guide_card.setObjectName("guideCard")
+        guide_vbox = QVBoxLayout(self.guide_card)
         guide_vbox.setContentsMargins(12, 10, 12, 10)
         guide_vbox.setSpacing(4)
         guide_vbox.addWidget(StrongBodyLabel("扫码连接指南："))
         guide_vbox.addWidget(CaptionLabel("1. 手机需与电脑连接在同一 Wi-Fi 或局域网"))
         guide_vbox.addWidget(CaptionLabel("2. 使用手机微信/相机/浏览器扫码"))
         guide_vbox.addWidget(CaptionLabel("3. 网页中输入 6 位验证码后即可拍照传输"))
-        left_layout.addWidget(guide_card)
+        left_layout.addWidget(self.guide_card)
 
         left_layout.addStretch(1)
-        self.splitter.addWidget(left_card)
+        self.splitter.addWidget(self.left_card)
 
         # (B) 右侧预览大图与历史列表
         right_widget = QWidget(self.home_interface)
@@ -455,6 +475,7 @@ class MainWindow(FluentWindow):
 
         self.net_combo = ComboBox(self.settings_container)
         self.net_combo.setMinimumWidth(280)
+        self.net_combo.currentIndexChanged.connect(self._on_network_card_changed)
         net_row.addWidget(self.net_combo, 1)
 
         net_row.addWidget(StrongBodyLabel("服务端口:", self.settings_container))
@@ -542,7 +563,7 @@ class MainWindow(FluentWindow):
         theme_layout.setContentsMargins(20, 16, 20, 16)
         theme_layout.setSpacing(10)
 
-        theme_layout.addWidget(SubtitleLabel("外观主题与 Windows 11 Mica 材质"))
+        theme_layout.addWidget(SubtitleLabel("外观主题"))
         theme_layout.addWidget(CaptionLabel("一键无缝切换系统的深色 / 浅色模式，持久化记忆偏好"))
 
         theme_row = QHBoxLayout()
@@ -555,6 +576,41 @@ class MainWindow(FluentWindow):
         theme_row.addWidget(self.theme_btn)
 
         theme_layout.addLayout(theme_row)
+
+        bg_row = QHBoxLayout()
+        bg_row.setSpacing(10)
+        bg_row.addWidget(StrongBodyLabel("软件背景图片:", self.settings_container))
+        bg_row.addStretch(1)
+
+        self.bg_combo = ComboBox(self.settings_container)
+        self.bg_combo.setMinimumWidth(200)
+        self.bg_combo.currentIndexChanged.connect(self._on_bg_image_changed)
+        bg_row.addWidget(self.bg_combo)
+
+        self.refresh_bg_btn = TransparentToolButton(FIF.SYNC, self.settings_container)
+        self.refresh_bg_btn.setToolTip("刷新背景图片列表")
+        self.refresh_bg_btn.clicked.connect(self._populate_bg_images)
+        bg_row.addWidget(self.refresh_bg_btn)
+
+        theme_layout.addLayout(bg_row)
+
+        slider_row = QHBoxLayout()
+        slider_row.setSpacing(10)
+        slider_row.addWidget(StrongBodyLabel("背景图片透明度:", self.settings_container))
+        slider_row.addStretch(1)
+
+        self.bg_opacity_val_lbl = CaptionLabel(f"{getattr(self.config_mgr, 'bg_opacity', 70)}%", self.settings_container)
+        self.bg_opacity_val_lbl.setStyleSheet("font-weight: bold; min-width: 42px;")
+        slider_row.addWidget(self.bg_opacity_val_lbl)
+
+        self.bg_slider = Slider(Qt.Orientation.Horizontal, self.settings_container)
+        self.bg_slider.setRange(10, 100)
+        self.bg_slider.setValue(getattr(self.config_mgr, "bg_opacity", 70))
+        self.bg_slider.setFixedWidth(180)
+        self.bg_slider.valueChanged.connect(self._on_bg_opacity_changed)
+        slider_row.addWidget(self.bg_slider)
+
+        theme_layout.addLayout(slider_row)
         settings_vbox.addWidget(theme_card)
 
         # 设置卡片 5: 关于与开发者信息
@@ -625,6 +681,7 @@ class MainWindow(FluentWindow):
 
         # 根据当前配置同步组件禁用状态
         self._on_rename_enabled_changed(self.config_mgr.auto_rename_enabled)
+        self._populate_bg_images()
 
     # ── 3. 业务逻辑与事件控制 ──
     def _populate_network_cards(self) -> None:
@@ -637,7 +694,6 @@ class MainWindow(FluentWindow):
             self.net_combo.addItem(label, userData=ip)
 
         self.net_combo.blockSignals(False)
-        self.net_combo.currentIndexChanged.connect(self._on_network_card_changed)
 
     def _start_server(self) -> None:
         """启动后台 HTTP 服务。"""
@@ -776,6 +832,8 @@ class MainWindow(FluentWindow):
         new_theme = "Dark" if isDarkTheme() else "Light"
         self.config_mgr.theme = new_theme
         self.config_mgr.save()
+        self._update_card_styles()
+        self.update()
 
         InfoBar.success(
             title="主题模式已切换",
@@ -784,6 +842,118 @@ class MainWindow(FluentWindow):
             position=InfoBarPosition.TOP,
             duration=2000,
         )
+
+    def _update_card_styles(self) -> None:
+        """更新左侧单一体化悬浮卡片组的半透明玻璃效果。"""
+        is_dark = isDarkTheme()
+        if is_dark:
+            left_style = "#leftCard { background-color: rgba(20, 20, 20, 0.40); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; }"
+            pin_style = "#pinCard { background-color: rgba(0, 95, 184, 0.15); border: 1px dashed #005fb8; border-radius: 10px; }"
+            guide_style = "#guideCard { background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; }"
+        else:
+            left_style = "#leftCard { background-color: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.65); border-radius: 16px; }"
+            pin_style = "#pinCard { background-color: rgba(0, 95, 184, 0.08); border: 1px dashed #005fb8; border-radius: 10px; }"
+            guide_style = "#guideCard { background-color: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.40); border-radius: 10px; }"
+
+        if hasattr(self, "left_card"):
+            self.left_card.setStyleSheet(left_style)
+        if hasattr(self, "pin_card"):
+            self.pin_card.setStyleSheet(pin_style)
+        if hasattr(self, "guide_card"):
+            self.guide_card.setStyleSheet(guide_style)
+
+    def _update_background_pixmap(self) -> None:
+        """从配置加载背景 QPixmap，并在未设置或图片不存在时置空。"""
+        bg_name = getattr(self.config_mgr, "background_image", "None")
+        if bg_name and bg_name != "None":
+            bg_path = get_background_dir() / bg_name
+            if bg_path.exists():
+                self._bg_pixmap = QPixmap(str(bg_path))
+            else:
+                self._bg_pixmap = None
+        else:
+            self._bg_pixmap = None
+        self.update()
+
+    def _populate_bg_images(self) -> None:
+        """动态遍历 assets/background/ 目录，填充设置中的背景选择下拉框。"""
+        self.bg_combo.blockSignals(True)
+        self.bg_combo.clear()
+
+        self.bg_combo.addItem("默认无背景", userData="None")
+
+        bg_dir = get_background_dir()
+        valid_exts = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+        current_bg = getattr(self.config_mgr, "background_image", "None")
+
+        selected_idx = 0
+        if bg_dir.exists():
+            idx = 1
+            for file_path in sorted(bg_dir.iterdir()):
+                if file_path.is_file() and file_path.suffix.lower() in valid_exts:
+                    fn = file_path.name
+                    self.bg_combo.addItem(fn, userData=fn)
+                    if fn == current_bg:
+                        selected_idx = idx
+                    idx += 1
+
+        self.bg_combo.setCurrentIndex(selected_idx)
+        self.bg_combo.blockSignals(False)
+
+    def _on_bg_image_changed(self, index: int) -> None:
+        """用户更改背景图片下拉选择项。"""
+        chosen_bg = self.bg_combo.itemData(index) or "None"
+        self.config_mgr.background_image = chosen_bg
+        self.config_mgr.save()
+
+        self._update_background_pixmap()
+
+        display_name = "默认无背景" if chosen_bg == "None" else chosen_bg
+        InfoBar.success(
+            title="背景图片已更新",
+            content=f"已生效背景设置: {display_name}",
+            parent=self,
+            position=InfoBarPosition.TOP,
+            duration=2500,
+        )
+
+    def _on_bg_opacity_changed(self, value: int) -> None:
+        """背景图片透明度滑块变更触发。"""
+        self.config_mgr.bg_opacity = value
+        self.config_mgr.save()
+        if hasattr(self, "bg_opacity_val_lbl"):
+            self.bg_opacity_val_lbl.setText(f"{value}%")
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        """重写 paintEvent 绘制自定义背景图及遮罩。"""
+        super().paintEvent(event)
+        if hasattr(self, "_bg_pixmap") and self._bg_pixmap and not self._bg_pixmap.isNull():
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+            win_size = self.size()
+            scaled_pix = self._bg_pixmap.scaled(
+                win_size,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            x = (win_size.width() - scaled_pix.width()) // 2
+            y = (win_size.height() - scaled_pix.height()) // 2
+
+            # 获取滑块控制的不透明度 (10% - 100%)
+            bg_op = getattr(self.config_mgr, "bg_opacity", 70) / 100.0
+            painter.setOpacity(bg_op)
+            painter.drawPixmap(x, y, scaled_pix)
+
+            # 恢复 100% 透明度绘制读写保护遮罩
+            painter.setOpacity(1.0)
+            is_dark = isDarkTheme()
+            mask_alpha = int(140 * (1.0 - bg_op * 0.3))
+            mask_color = QColor(20, 20, 20, mask_alpha) if is_dark else QColor(245, 245, 245, mask_alpha)
+            painter.fillRect(self.rect(), mask_color)
+            painter.end()
 
     @Slot(int)
     def _on_network_card_changed(self, index: int) -> None:

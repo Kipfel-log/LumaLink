@@ -36,7 +36,9 @@ class AppConfig:
         self.save_dir: str = str(default_dir)
         self.server_port: int = 8989
         self.preferred_ip: str = ""
-        self.theme: str = "Auto"
+        self.theme: str = "Dark"
+        self.background_image: str = "kipfel_1.png"
+        self.bg_opacity: int = 100
 
         # 自动重命名设置
         self.auto_rename_enabled: bool = True
@@ -62,6 +64,8 @@ class AppConfig:
                 self.server_port = int(data.get("server_port", self.server_port))
                 self.preferred_ip = str(data.get("preferred_ip", self.preferred_ip))
                 self.theme = str(data.get("theme", self.theme))
+                self.background_image = str(data.get("background_image", self.background_image))
+                self.bg_opacity = int(data.get("bg_opacity", self.bg_opacity))
 
                 self.auto_rename_enabled = bool(data.get("auto_rename_enabled", self.auto_rename_enabled))
                 self.name_prefix = str(data.get("name_prefix", self.name_prefix))
@@ -79,6 +83,8 @@ class AppConfig:
             "server_port": self.server_port,
             "preferred_ip": self.preferred_ip,
             "theme": self.theme,
+            "background_image": self.background_image,
+            "bg_opacity": self.bg_opacity,
             "auto_rename_enabled": self.auto_rename_enabled,
             "name_prefix": self.name_prefix,
             "start_index": self.start_index,
