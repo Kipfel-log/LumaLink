@@ -40,6 +40,10 @@ class AppConfig:
         self.background_image: str = "kipfel_1.png"
         self.bg_opacity: int = 100
 
+        # 超时断联设置
+        self.timeout_enabled: bool = True
+        self.timeout_seconds: int = 30
+
         # 自动重命名设置
         self.auto_rename_enabled: bool = True
         self.name_prefix: str = "IMG_"
@@ -67,6 +71,9 @@ class AppConfig:
                 self.background_image = str(data.get("background_image", self.background_image))
                 self.bg_opacity = int(data.get("bg_opacity", self.bg_opacity))
 
+                self.timeout_enabled = bool(data.get("timeout_enabled", self.timeout_enabled))
+                self.timeout_seconds = int(data.get("timeout_seconds", self.timeout_seconds))
+
                 self.auto_rename_enabled = bool(data.get("auto_rename_enabled", self.auto_rename_enabled))
                 self.name_prefix = str(data.get("name_prefix", self.name_prefix))
                 self.start_index = int(data.get("start_index", self.start_index))
@@ -85,6 +92,8 @@ class AppConfig:
             "theme": self.theme,
             "background_image": self.background_image,
             "bg_opacity": self.bg_opacity,
+            "timeout_enabled": self.timeout_enabled,
+            "timeout_seconds": self.timeout_seconds,
             "auto_rename_enabled": self.auto_rename_enabled,
             "name_prefix": self.name_prefix,
             "start_index": self.start_index,

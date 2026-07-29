@@ -26,13 +26,16 @@ from PySide6.QtWidgets import (
 )
 
 
+def get_app_root() -> Path:
+    """获取应用程序运行根目录（兼容源码开发、PyInstaller打包与Nuitka C++编译环境）。"""
+    if getattr(sys, "frozen", False) or "__compiled__" in globals():
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    return Path(__file__).resolve().parent
+
+
 def get_background_dir() -> Path:
     """获取背景图片资源存放目录 Path。"""
-    if getattr(sys, "frozen", False):
-        base_dir = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
-    else:
-        base_dir = Path(__file__).resolve().parent
-    bg_dir = base_dir / "assets" / "background"
+    bg_dir = get_app_root() / "assets" / "background"
     bg_dir.mkdir(parents=True, exist_ok=True)
     return bg_dir
 
@@ -216,7 +219,7 @@ class MainWindow(FluentWindow):
         self.setMinimumSize(850, 580)
 
         # 设置系统窗口级图标 (优先构造 QPixmap 加载确保 Windows 任务栏正常渲染图标)
-        icon_path = Path(__file__).resolve().parent / "assets" / "lumalink_icon_mark.png"
+        icon_path = get_app_root() / "assets" / "lumalink_icon_mark.png"
         if icon_path.exists():
             icon_pixmap = QPixmap(str(icon_path))
             if not icon_pixmap.isNull():
@@ -491,6 +494,38 @@ class MainWindow(FluentWindow):
         net_layout.addLayout(net_row)
         settings_vbox.addWidget(net_card)
 
+        # 设置卡片: 设备连接与超时断联设置
+        timeout_card = CardWidget(self.settings_container)
+        timeout_layout = QVBoxLayout(timeout_card)
+        timeout_layout.setContentsMargins(20, 16, 20, 16)
+        timeout_layout.setSpacing(12)
+
+        timeout_header = QHBoxLayout()
+        timeout_header.addWidget(SubtitleLabel("设备连接与超时断联设置"))
+        timeout_header.addStretch(1)
+
+        self.timeout_switch = SwitchButton("启用超时自动断线", self.settings_container)
+        self.timeout_switch.setChecked(self.config_mgr.timeout_enabled)
+        self.timeout_switch.checkedChanged.connect(self._on_timeout_enabled_changed)
+        timeout_header.addWidget(self.timeout_switch)
+        timeout_layout.addLayout(timeout_header)
+
+        timeout_layout.addWidget(CaptionLabel("开启后，当手机设备长时间未与电脑保持心跳通信时，系统将自动将其标记为断开状态"))
+
+        timeout_row = QHBoxLayout()
+        timeout_row.setSpacing(10)
+        timeout_row.addWidget(StrongBodyLabel("超时断线时间 (秒):", self.settings_container))
+
+        self.timeout_spin = SpinBox(self.settings_container)
+        self.timeout_spin.setRange(5, 3600)
+        self.timeout_spin.setValue(self.config_mgr.timeout_seconds)
+        self.timeout_spin.valueChanged.connect(self._on_timeout_seconds_changed)
+        timeout_row.addWidget(self.timeout_spin)
+        timeout_row.addStretch(1)
+
+        timeout_layout.addLayout(timeout_row)
+        settings_vbox.addWidget(timeout_card)
+
         # 设置卡片 3: 文件自动重命名与序号设置
         rename_card = CardWidget(self.settings_container)
         rename_layout = QVBoxLayout(rename_card)
@@ -656,7 +691,7 @@ class MainWindow(FluentWindow):
         footer_vbox.setSpacing(6)
         footer_vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        full_logo_path = Path(__file__).resolve().parent / "assets" / "lumalink_full_lockup.png"
+        full_logo_path = get_app_root() / "assets" / "lumalink_full_lockup.png"
         if full_logo_path.exists():
             logo_label = QLabel(self.settings_container)
             logo_pix = QPixmap(str(full_logo_path))
@@ -680,6 +715,7 @@ class MainWindow(FluentWindow):
         settings_vbox.addStretch(1)
 
         # 根据当前配置同步组件禁用状态
+        self._on_timeout_enabled_changed(self.config_mgr.timeout_enabled)
         self._on_rename_enabled_changed(self.config_mgr.auto_rename_enabled)
         self._populate_bg_images()
 
@@ -773,6 +809,18 @@ class MainWindow(FluentWindow):
                 position=InfoBarPosition.TOP,
                 duration=4000,
             )
+
+    def _on_timeout_enabled_changed(self, checked: bool) -> None:
+        """超时断联开关变更。"""
+        self.config_mgr.timeout_enabled = checked
+        self.config_mgr.save()
+        if hasattr(self, "timeout_spin"):
+            self.timeout_spin.setEnabled(checked)
+
+    def _on_timeout_seconds_changed(self, val: int) -> None:
+        """超时断线时长变更。"""
+        self.config_mgr.timeout_seconds = val
+        self.config_mgr.save()
 
     def _on_rename_enabled_changed(self, checked: bool) -> None:
         """重命名开关变更。"""

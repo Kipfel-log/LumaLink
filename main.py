@@ -32,6 +32,13 @@ from config_manager import AppConfig
 from main_window import MainWindow, load_svg_pixmap
 
 
+def get_app_root() -> Path:
+    """获取应用程序运行根目录（兼容源码开发、PyInstaller打包与Nuitka C++编译环境）。"""
+    if getattr(sys, "frozen", False) or "__compiled__" in globals():
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    return Path(__file__).resolve().parent
+
+
 def main() -> None:
     # 启用高 DPI 屏幕自适应缩放
     QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -41,7 +48,7 @@ def main() -> None:
     app = QApplication(sys.argv)
 
     # 设置任务栏全局图标 (assets/lumalink_icon_mark.png)
-    icon_path = Path(__file__).resolve().parent / "assets" / "lumalink_icon_mark.png"
+    icon_path = get_app_root() / "assets" / "lumalink_icon_mark.png"
     if icon_path.exists():
         from PySide6.QtGui import QPixmap
         pix = QPixmap(str(icon_path))

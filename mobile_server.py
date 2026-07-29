@@ -507,11 +507,15 @@ class MobileServerManager(QObject):
     def _timeout_checker(self) -> None:
         while self.is_running:
             time.sleep(3)
+            if self.config_mgr and not self.config_mgr.timeout_enabled:
+                continue
+
+            timeout_secs = self.config_mgr.timeout_seconds if self.config_mgr else 30
             now = time.time()
             disconnected_tokens = []
             with self._lock:
                 for token, info in list(self.active_devices.items()):
-                    if now - info["last_heartbeat"] > 30:  # 30秒无心跳即掉线
+                    if now - info["last_heartbeat"] > timeout_secs:
                         disconnected_tokens.append((token, info["ua"]))
                         del self.active_devices[token]
             
