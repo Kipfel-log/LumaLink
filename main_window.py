@@ -16,6 +16,7 @@ from PySide6.QtCore import QSize, Qt, QTimer, QUrl, Slot
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, QIcon, QImage, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
+    QApplication,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -162,6 +163,11 @@ class PhotoItemWidget(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(4)
 
+        self.copy_btn = TransparentToolButton(FIF.COPY, self)
+        self.copy_btn.setToolTip("复制图片到剪贴板")
+        self.copy_btn.clicked.connect(self._copy_image_to_clipboard)
+        btn_layout.addWidget(self.copy_btn)
+
         self.open_folder_btn = TransparentToolButton(FIF.FOLDER, self)
         self.open_folder_btn.setToolTip("在文件夹中选中此照片")
         self.open_folder_btn.clicked.connect(self._locate_file)
@@ -178,6 +184,19 @@ class PhotoItemWidget(QWidget):
         btn_layout.addWidget(self.del_btn)
 
         layout.addLayout(btn_layout)
+
+    def _copy_image_to_clipboard(self) -> None:
+        if self.qimg and not self.qimg.isNull():
+            QApplication.clipboard().setImage(self.qimg)
+            win = self.window()
+            if win:
+                InfoBar.success(
+                    title="已复制到剪贴板",
+                    content=f"照片 {self.path_obj.name} 已写入系统剪贴板",
+                    parent=win,
+                    position=InfoBarPosition.TOP_RIGHT,
+                    duration=2500,
+                )
 
     def _locate_file(self) -> None:
         if self.path_obj.exists():
@@ -463,6 +482,25 @@ class MainWindow(FluentWindow):
         dir_layout.addLayout(dir_row)
         settings_vbox.addWidget(dir_card)
 
+        # 设置卡片: 剪贴板自动复制设置
+        copy_card = CardWidget(self.settings_container)
+        copy_layout = QVBoxLayout(copy_card)
+        copy_layout.setContentsMargins(20, 16, 20, 16)
+        copy_layout.setSpacing(12)
+
+        copy_header = QHBoxLayout()
+        copy_header.addWidget(SubtitleLabel("剪贴板自动复制设置"))
+        copy_header.addStretch(1)
+
+        self.copy_clipboard_switch = SwitchButton("拍摄后自动复制照片到剪贴板", self.settings_container)
+        self.copy_clipboard_switch.setChecked(self.config_mgr.auto_copy_clipboard)
+        self.copy_clipboard_switch.checkedChanged.connect(self._on_copy_clipboard_changed)
+        copy_header.addWidget(self.copy_clipboard_switch)
+        copy_layout.addLayout(copy_header)
+
+        copy_layout.addWidget(CaptionLabel("开启后，手机拍摄传输成功的照片将自动写入系统剪贴板，方便直接 Ctrl+V 粘贴到聊天软件或文档中"))
+        settings_vbox.addWidget(copy_card)
+
         # 设置卡片 2: 通信网卡与自定义服务端口
         net_card = CardWidget(self.settings_container)
         net_layout = QVBoxLayout(net_card)
@@ -706,7 +744,7 @@ class MainWindow(FluentWindow):
         desc_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         footer_vbox.addWidget(desc_lbl, 0, Qt.AlignmentFlag.AlignCenter)
 
-        ver_lbl = CaptionLabel("v1.2", self.settings_container)
+        ver_lbl = CaptionLabel("v1.3", self.settings_container)
         ver_lbl.setStyleSheet("color: #aaaaaa; font-size: 11px;")
         ver_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         footer_vbox.addWidget(ver_lbl, 0, Qt.AlignmentFlag.AlignCenter)
@@ -809,6 +847,11 @@ class MainWindow(FluentWindow):
                 position=InfoBarPosition.TOP,
                 duration=4000,
             )
+
+    def _on_copy_clipboard_changed(self, checked: bool) -> None:
+        """剪贴板自动复制开关变更。"""
+        self.config_mgr.auto_copy_clipboard = checked
+        self.config_mgr.save()
 
     def _on_timeout_enabled_changed(self, checked: bool) -> None:
         """超时断联开关变更。"""
@@ -1051,9 +1094,18 @@ class MainWindow(FluentWindow):
 
         self._update_list_ui()
 
+        # 若开启自动复制到剪贴板，则自动将 QImage 写入系统剪贴板
+        copied_msg = ""
+        if self.config_mgr.auto_copy_clipboard:
+            try:
+                QApplication.clipboard().setImage(qimg)
+                copied_msg = "，并已自动复制到剪贴板"
+            except Exception as e:
+                print(f"[Clipboard] 自动复制图片失败: {e}")
+
         InfoBar.success(
             title="手机拍照保存成功",
-            content=f"图片已保存为 {path_obj.name} 至当前保存目录",
+            content=f"图片已保存为 {path_obj.name}{copied_msg}",
             parent=self,
             position=InfoBarPosition.TOP_RIGHT,
             duration=3500,

@@ -40,6 +40,9 @@ class AppConfig:
         self.background_image: str = "kipfel_1.png"
         self.bg_opacity: int = 100
 
+        # 自动复制剪贴板设置
+        self.auto_copy_clipboard: bool = True
+
         # 超时断联设置
         self.timeout_enabled: bool = True
         self.timeout_seconds: int = 30
@@ -71,6 +74,8 @@ class AppConfig:
                 self.background_image = str(data.get("background_image", self.background_image))
                 self.bg_opacity = int(data.get("bg_opacity", self.bg_opacity))
 
+                self.auto_copy_clipboard = bool(data.get("auto_copy_clipboard", self.auto_copy_clipboard))
+
                 self.timeout_enabled = bool(data.get("timeout_enabled", self.timeout_enabled))
                 self.timeout_seconds = int(data.get("timeout_seconds", self.timeout_seconds))
 
@@ -92,6 +97,7 @@ class AppConfig:
             "theme": self.theme,
             "background_image": self.background_image,
             "bg_opacity": self.bg_opacity,
+            "auto_copy_clipboard": self.auto_copy_clipboard,
             "timeout_enabled": self.timeout_enabled,
             "timeout_seconds": self.timeout_seconds,
             "auto_rename_enabled": self.auto_rename_enabled,

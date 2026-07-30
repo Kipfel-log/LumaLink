@@ -1,27 +1,16 @@
 import ctypes
 import os
 import sys
+import multiprocessing
 from pathlib import Path
 
 # 注册 Windows 显式 AppUserModelID，确保 Windows 任务栏正常显示自定义应用图标
 try:
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("KipfelLog.LumaLink.v1.2")
+    import ctypes
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("KipfelLog.LumaLink.v1.3")
 except Exception:
     pass
 
-# 修复 Windows PyInstaller 环境下 PySide6 C++ DLL 加载路径问题
-if getattr(sys, "frozen", False):
-    base_dir = Path(sys.executable).parent
-    internal_dir = base_dir / "_internal"
-    pyside_dir = internal_dir / "PySide6"
-    for d in [pyside_dir, internal_dir, pyside_dir / "Qt" / "bin"]:
-        if d.exists():
-            try:
-                os.add_dll_directory(str(d))
-            except Exception:
-                pass
-
-# 显式首先导入 PySide6 触发 C++ 动态库初始化
 import PySide6
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QIcon
@@ -33,8 +22,8 @@ from main_window import MainWindow, load_svg_pixmap
 
 
 def get_app_root() -> Path:
-    """获取应用程序运行根目录（兼容源码开发、PyInstaller打包与Nuitka C++编译环境）。"""
-    if getattr(sys, "frozen", False) or "__compiled__" in globals():
+    """获取应用程序运行根目录（兼容 PyInstaller 打包与源码开发环境）。"""
+    if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
     return Path(__file__).resolve().parent
 
@@ -78,4 +67,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()

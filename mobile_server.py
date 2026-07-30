@@ -358,16 +358,13 @@ class MobileHTTPHandler(BaseHTTPRequestHandler):
                 # 使用 PIL 与 ImageOps.exif_transpose 自动校正手机竖屏/横屏 EXIF 旋转
                 try:
                     from PIL import Image, ImageOps
-                    import numpy as np
 
                     pil_img = Image.open(io.BytesIO(img_bytes))
                     pil_img = ImageOps.exif_transpose(pil_img)
-                    if pil_img.mode not in ("RGB", "RGBA"):
-                        pil_img = pil_img.convert("RGB")
-                    arr = np.array(pil_img)
-                    h, w, ch = arr.shape
-                    qfmt = QImage.Format.Format_RGB888 if ch == 3 else QImage.Format.Format_RGBA8888
-                    qimg = QImage(arr.data, w, h, ch * w, qfmt).copy()
+                    buf = io.BytesIO()
+                    pil_img.save(buf, format="PNG")
+                    qimg = QImage()
+                    qimg.loadFromData(buf.getvalue())
                 except Exception:
                     qimg = QImage()
                     qimg.loadFromData(img_bytes)
