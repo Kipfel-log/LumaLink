@@ -1,0 +1,332 @@
+<Window
+    x:Class="LumaLink.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:LumaLink"
+    Title="LumaLink 拾光">
+
+    <Grid x:Name="RootGrid">
+        <!-- 自定义背景图 + 遮罩 -->
+        <Image x:Name="BgImage" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        <Rectangle x:Name="BgMask" />
+
+        <NavigationView x:Name="Nav"
+                        PaneDisplayMode="Left"
+                        IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="False"
+                        OpenPaneLength="200"
+                        CompactPaneLength="48"
+                        Background="Transparent"
+                        SelectionChanged="Nav_SelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="HomeItem" Content="无线拍照主页" Tag="home">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE722;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem x:Name="SettingsItem" Content="应用设置" Tag="settings">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
+
+            <Grid>
+                <!-- ═════ 无线拍照主页 ═════ -->
+                <Grid x:Name="HomePanel" Padding="18,16" ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" MinWidth="340" MaxWidth="460" />
+                        <ColumnDefinition Width="3*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 左：扫码配对 -->
+                    <Border Grid.Column="0" Background="{ThemeResource LumaGlassBrush}"
+                            BorderBrush="{ThemeResource LumaGlassStrokeBrush}" BorderThickness="1" CornerRadius="12" Padding="18,16">
+                        <Grid RowSpacing="12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0">
+                                <TextBlock Text="扫码无线配对" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                <TextBlock x:Name="StatusText" Text="服务准备中..." HorizontalAlignment="Right"
+                                           VerticalAlignment="Center" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                            </Grid>
+
+                            <StackPanel Grid.Row="1" HorizontalAlignment="Center" Spacing="8">
+                                <Border Width="218" Height="218" Background="White" CornerRadius="10" Padding="4"
+                                        BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="2">
+                                    <Image x:Name="QrImage" Stretch="Uniform" />
+                                </Border>
+                                <TextBlock x:Name="UrlText" Text="正在检测局域网地址..." HorizontalAlignment="Center"
+                                           FontWeight="SemiBold" FontSize="15" IsTextSelectionEnabled="True"
+                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </StackPanel>
+
+                            <Border Grid.Row="2" Background="{ThemeResource LumaPinBrush}" CornerRadius="8" Padding="14,8"
+                                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="手机网页 6 位验证码:" Style="{StaticResource HintText}" />
+                                        <TextBlock x:Name="PinText" Text="------" FontSize="30" FontWeight="ExtraBold"
+                                                   CharacterSpacing="300" IsTextSelectionEnabled="True"
+                                                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" x:Name="RefreshPinBtn" Click="RefreshPin_Click" Padding="10"
+                                            VerticalAlignment="Center" ToolTipService.ToolTip="刷新验证码">
+                                        <FontIcon Glyph="&#xE72C;" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <TextBlock Grid.Row="3" x:Name="ClientText" Text="已连接设备: 0 台手机" Style="{StaticResource HintText}" />
+
+                            <Border Grid.Row="4" Background="{ThemeResource LumaInnerGlassBrush}"
+                                    BorderBrush="{ThemeResource LumaGlassStrokeBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="12,10">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="扫码连接指南：" FontWeight="SemiBold" />
+                                    <TextBlock Text="1. 手机需与电脑连接在同一 Wi-Fi 或局域网" Style="{StaticResource HintText}" />
+                                    <TextBlock Text="2. 使用手机微信/相机/浏览器扫码" Style="{StaticResource HintText}" />
+                                    <TextBlock Text="3. 网页中输入 6 位验证码后即可拍照传输" Style="{StaticResource HintText}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- 右：预览 + 历史 -->
+                    <Grid Grid.Column="1" RowSpacing="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="4*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="3*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="最新拍摄照片预览" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Background="{ThemeResource LumaPinBrush}" CornerRadius="6" Padding="10,4" VerticalAlignment="Center">
+                                <TextBlock x:Name="NextSeqText" Text="下一张照片: #001 (IMG_001.jpg)" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
+                            <TextBlock Grid.Column="3" x:Name="CountText" Text="本次启动已接收: 0 张照片" Style="{StaticResource HintText}" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- 等比例居中预览（Uniform 即 KeepAspectRatio，绝不拉伸） -->
+                        <Border Grid.Row="1" Background="#1A1A1E" CornerRadius="8" BorderBrush="#333333" BorderThickness="1" MinHeight="210">
+                            <Grid>
+                                <Image x:Name="PreviewImage" Stretch="Uniform" />
+                                <TextBlock x:Name="PreviewHint" TextAlignment="Center" TextWrapping="Wrap"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#888888"
+                                           Text="等待手机扫码拍照...&#x0A;拍摄照片将实时在此展示大图，并同步写入电脑保存目录" />
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="2">
+                            <TextBlock x:Name="HistoryTitle" Text="已保存照片历史 (0 张)" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button x:Name="ClearBtn" HorizontalAlignment="Right" IsEnabled="False" Click="Clear_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                    <TextBlock Text="清空列表显示" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <Border Grid.Row="3" Background="{ThemeResource LumaCardBrush}" CornerRadius="8"
+                                BorderBrush="{ThemeResource LumaGlassStrokeBrush}" BorderThickness="1">
+                            <ListView x:Name="PhotoList" SelectionMode="Single" DoubleTapped="PhotoList_DoubleTapped"
+                                      ItemsSource="{x:Bind Photos}">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="local:PhotoItem">
+                                        <Grid ColumnSpacing="12" Padding="2,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="100" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="100" Height="75" CornerRadius="6" Background="#40000000">
+                                                <Image Source="{x:Bind Thumb}" Stretch="Uniform" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{x:Bind InfoText}" Style="{StaticResource HintText}" />
+                                                <TextBlock Text="{x:Bind DetailText}" Style="{StaticResource HintText}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+                                                <Button Click="CopyPhoto_Click" ToolTipService.ToolTip="复制图片到剪贴板"
+                                                        Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE8C8;" FontSize="16" /></Button>
+                                                <Button Click="LocatePhoto_Click" ToolTipService.ToolTip="在文件夹中选中此照片"
+                                                        Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE838;" FontSize="16" /></Button>
+                                                <Button Click="OpenPhoto_Click" ToolTipService.ToolTip="用系统查看器打开原图"
+                                                        Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE890;" FontSize="16" /></Button>
+                                                <Button Click="DeletePhoto_Click" ToolTipService.ToolTip="从磁盘彻底删除"
+                                                        Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE74D;" FontSize="16" /></Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Border>
+                    </Grid>
+                </Grid>
+
+                <!-- ═════ 应用设置 ═════ -->
+                <ScrollViewer x:Name="SettingsPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Padding="24,20" Spacing="14" MaxWidth="920" HorizontalAlignment="Stretch">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="应用设置" Style="{StaticResource TitleTextBlockStyle}" />
+                            <TextBlock Text="管理照片存入路径、通信服务端口与网卡、文件自动重命名规则及外观主题（自动保存）" Style="{StaticResource HintText}" />
+                        </StackPanel>
+
+                        <!-- 保存目录 -->
+                        <Border Style="{StaticResource GlassCard}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="照片保存目录设置" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                <TextBlock Text="设置从手机拍摄并实时存入电脑本地的文件保存路径" Style="{StaticResource HintText}" />
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="PathBox" IsReadOnly="True" Header="当前目录" />
+                                    <Button Grid.Column="1" VerticalAlignment="Bottom" Style="{StaticResource AccentButtonStyle}" Click="BrowseDir_Click" Content="浏览选择目录" />
+                                    <Button Grid.Column="2" VerticalAlignment="Bottom" Click="OpenDir_Click" Content="打开保存目录" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 剪贴板 -->
+                        <Border Style="{StaticResource GlassCard}">
+                            <StackPanel Spacing="8">
+                                <Grid>
+                                    <TextBlock Text="剪贴板自动复制设置" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                    <ToggleSwitch x:Name="ClipboardSwitch" HorizontalAlignment="Right" OnContent="拍摄后自动复制照片到剪贴板"
+                                                  OffContent="拍摄后自动复制照片到剪贴板" Toggled="ClipboardSwitch_Toggled" MinWidth="0" />
+                                </Grid>
+                                <TextBlock Text="开启后，手机拍摄传输成功的照片将自动写入系统剪贴板，方便直接 Ctrl+V 粘贴到聊天软件或文档中" Style="{StaticResource HintText}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 网络 -->
+                        <Border Style="{StaticResource GlassCard}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="通信网卡与自定义服务端口" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                <TextBlock Text="可自定义局域网 HTTP 通信端口，并选择手机扫码访问的主机 IP 地址" Style="{StaticResource HintText}" />
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="NetCombo" Header="通信网卡/IP" HorizontalAlignment="Stretch" SelectionChanged="NetCombo_SelectionChanged" />
+                                    <NumberBox Grid.Column="1" x:Name="PortBox" Header="服务端口" Minimum="1024" Maximum="65535" Value="8989"
+                                               SpinButtonPlacementMode="Inline" Width="150" />
+                                    <Button Grid.Column="2" VerticalAlignment="Bottom" Style="{StaticResource AccentButtonStyle}" Click="ApplyPort_Click" Content="应用端口设置" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 超时 -->
+                        <Border Style="{StaticResource GlassCard}">
+                            <StackPanel Spacing="8">
+                                <Grid>
+                                    <TextBlock Text="设备连接与超时断联设置" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                    <ToggleSwitch x:Name="TimeoutSwitch" HorizontalAlignment="Right" OnContent="启用超时自动断线"
+                                                  OffContent="启用超时自动断线" Toggled="TimeoutSwitch_Toggled" MinWidth="0" />
+                                </Grid>
+                                <TextBlock Text="开启后，当手机设备长时间未与电脑保持心跳通信时，系统将自动将其标记为断开状态" Style="{StaticResource HintText}" />
+                                <NumberBox x:Name="TimeoutBox" Header="超时断线时间 (秒)" Minimum="5" Maximum="3600" Value="30"
+                                           SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" Width="200" ValueChanged="TimeoutBox_ValueChanged" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 重命名 -->
+                        <Border Style="{StaticResource GlassCard}">
+                            <StackPanel Spacing="10">
+                                <Grid>
+                                    <TextBlock Text="文件自动重命名与序号规则" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                    <ToggleSwitch x:Name="RenameSwitch" HorizontalAlignment="Right" OnContent="启用文件自动重命名"
+                                                  OffContent="启用文件自动重命名" Toggled="RenameSwitch_Toggled" MinWidth="0" />
+                                </Grid>
+                                <TextBlock Text="开启后，手机接收的照片将按设定的前缀与自动递增序号重命名（手机及电脑预览端实时提示下一张序号）" Style="{StaticResource HintText}" />
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="PrefixBox" Header="文件名前缀" PlaceholderText="例如: IMG_ 或 Photo_" TextChanged="PrefixBox_TextChanged" />
+                                    <NumberBox Grid.Column="1" x:Name="SeqBox" Header="起始 / 当前序号" Minimum="1" Maximum="999999" Value="1"
+                                               SpinButtonPlacementMode="Inline" ValueChanged="SeqBox_ValueChanged" />
+                                    <NumberBox Grid.Column="2" x:Name="DigitBox" Header="序号位数补零" Minimum="1" Maximum="8" Value="3"
+                                               SpinButtonPlacementMode="Inline" ValueChanged="DigitBox_ValueChanged" />
+                                </Grid>
+                                <TextBlock x:Name="RenamePreviewText" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource SystemFillColorSuccessBrush}" Text="效果预估: IMG_001.jpg" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 外观 -->
+                        <Border Style="{StaticResource GlassCard}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="外观主题" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                <TextBlock Text="选择深色 / 浅色或跟随系统，并自定义背景图片与透明度（自动保存）" Style="{StaticResource HintText}" />
+                                <ComboBox x:Name="ThemeCombo" Header="当前主题风格" Width="260" SelectionChanged="ThemeCombo_SelectionChanged">
+                                    <ComboBoxItem Content="跟随系统" Tag="Auto" />
+                                    <ComboBoxItem Content="浅色" Tag="Light" />
+                                    <ComboBoxItem Content="深色" Tag="Dark" />
+                                </ComboBox>
+                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                                    <ComboBox x:Name="BgCombo" Header="软件背景图片" Width="260" SelectionChanged="BgCombo_SelectionChanged" />
+                                    <Button VerticalAlignment="Bottom" Click="RefreshBg_Click" ToolTipService.ToolTip="刷新背景图片列表">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                                    </Button>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Slider x:Name="OpacitySlider" Header="背景图片透明度" Minimum="10" Maximum="100" Width="260" ValueChanged="OpacitySlider_ValueChanged" />
+                                    <TextBlock x:Name="OpacityText" Text="100%" VerticalAlignment="Bottom" Margin="0,0,0,8" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 关于 -->
+                        <Border Style="{StaticResource GlassCard}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="关于与开发者" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                <TextBlock Text="GitHub 开发者: Kipfel-Log" FontWeight="SemiBold" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <HyperlinkButton Content="GitHub: Kipfel-Log" NavigateUri="https://github.com/Kipfel-log" />
+                                    <HyperlinkButton Content="GitHub: LumaLink" NavigateUri="https://github.com/Kipfel-log/LumaLink" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel HorizontalAlignment="Center" Spacing="6" Margin="0,18,0,12">
+                            <Image x:Name="LogoImage" Width="140" />
+                            <TextBlock Text="极简局域网无线拍照助手" Style="{StaticResource HintText}" HorizontalAlignment="Center" />
+                            <TextBlock Text="v2.0 (WinUI 3 原生版)" Style="{StaticResource HintText}" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </NavigationView>
+
+        <!-- 通知条 -->
+        <StackPanel x:Name="InfoHost" HorizontalAlignment="Right" VerticalAlignment="Top" Width="380" Margin="0,8,16,0" Spacing="6" />
+    </Grid>
+</Window>
