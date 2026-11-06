@@ -4,9 +4,9 @@ namespace LumaLink;
 
 public sealed class PhotoItem
 {
-    public required string Path { get; init; }
+    public string Path { get; set; } = string.Empty;
     public string Name => System.IO.Path.GetFileName(Path);
-    public required string InfoText { get; init; }     // 时间/设备
-    public required string DetailText { get; init; }   // 分辨率 | 大小
-    public required BitmapImage Thumb { get; init; }
+    public string InfoText { get; set; } = string.Empty;     // 时间/设备
+    public string DetailText { get; set; } = string.Empty;   // 分辨率 | 大小
+    public BitmapImage Thumb { get; set; } = new();
 }
